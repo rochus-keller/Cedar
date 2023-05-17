@@ -1,0 +1,198 @@
+// Copyright 2023 me@rochus-keller.ch and others
+// License: GPL
+// Steps: 
+// - copied from https://xeroxparcarchive.computerhistory.org/_cdcsl_93-16_/1/cedar/release/cedardoc/.CedarSyntax.tioga.html
+// - adapted to EbnfStudio syntax, reduced lexer productions, explicit number, char and symbol productions
+// - removed direct left recursions
+// - in process of removing LL(1) ambigs, remaining sequence ambigs
+
+module ::= [directory] n ':' [CEDAR] ( defsHead tilde defsBody | implHead tilde implBody ) '.'
+directory ::= DIRECTORY [ include { ',' include } ] ';'
+include ::= n [ ':'  ( TYPE [n] | FROM string ) ] [ USING '[' [n { ',' n } ] ']' ]
+defsHead ::= DEFINITIONS [locks] [imports] [shares]
+implHead ::= [safety] ( PROGRAM | MONITOR ) arguments [locks] [imports] [exports] [shares]
+defsBody ::= [access] 
+	( '{' [open] definition { ';' [definition] } '}' 
+	| BEGIN [open] definition { ';' [definition] } END )
+implBody ::= [access] [checking] block
+locks ::= LOCKS primary [ USING n ':' t ]
+imports ::= IMPORTS [ ( n [ ':' n] ) { ',' ( n [ ':' n] ) } ]
+exports ::= EXPORTS [ ( n [ ':' n] ) { ',' ( n [ ':' n] ) } ]
+shares ::= SHARES n { ',' n }
+access ::= PUBLIC | PRIVATE
+safety ::= SAFE | UNSAFE
+checking ::= CHECKED | TRUSTED | UNCHECKED
+definition ::= n { ',' n } ':' [access] 
+	( [entry | READONLY] t [tilde initVal]
+	| TYPE [ '[' e ']' | tilde [access] t [default] ] ) 
+declaration ::= n { ',' n } ':' [access] 
+	( [entry] t [ ( tilde | '←' ) initVal ]
+	| TYPE tilde [access] t [default] ) 
+entry ::= ENTRY | INTERNAL
+tilde ::= '~' | '='
+initVal ::= e | trash // included in e: | CODE 
+	| [checking] ( [INLINE] block | MACHINE CODE machineCode )
+machineCode ::= '{' [ e { ',' e } { ';' [ e { ',' e } ] } ] '}'
+	| BEGIN [ e { ',' e } { ';' [ e { ',' e } ] } ] END
+default ::= '←' [ e [ '|' trash ] | trash ]
+trash ::= TRASH | NULL
+s ::= // statement
+	NULL 
+	| lhs ( '←' ( e | STATE ) | '.' FREE '[' e [catch] ']'  )
+	| FREE '[' e [catch] ']' 
+	| STATE '←' e 
+	| STOP
+	| '[' argList ']' '←' e 
+	| ERROR [ lhs ]
+	| SIGNAL lhs
+	| WAIT lhs 
+	| NOTIFY lhs 
+	| BROADCAST lhs 
+	| JOIN lhs
+	| EXIT | LOOP | GOTO n | GO TO n 
+	| RETURN [ [WITH [ERROR]] lhs ] // lhs includes '[' argList ']'
+	| CONTINUE | RETRY | REJECT 
+	| RESUME [ lhs ] // lhs includes '[' argList ']'
+	| [checking] block
+	| [for] [while] DO scope [repeat] ENDLOOP
+	| IF e THEN s [ ELSE s ]
+	| SELECT e FROM [ ( test { ',' test } '=>' s ) { ';' [ ( test { ',' test } '=>' s ) ] } ] ENDCASE [ '=>' s ]
+	| WITH openItem // includes e
+		SELECT [e] FROM 
+			[ ( e (':' t | { ',' e } )'=>' s ) { ';' [ ( e ( ':' t | { ',' e } ) '=>' s ) ]} ] 
+			ENDCASE [ '=>' s ]
+	| START lhs | RESTART lhs | TRANSFER WITH lhs 
+block ::= '{' scope [exits] '}' | BEGIN scope [exits] END
+scope ::= [open] [enable] { declaration ';' } [ s { ';' [s] } ]
+open ::= OPEN openItem { ',' openItem } ';'
+openItem ::= e [ ':' e | '~~' e ] // e includes n
+enable ::= ENABLE 
+	( lastCatch 
+	| '{' [ catchList [';'] ] '}'
+	| BEGIN [ catchList [';'] ] END ) 
+	';'
+catchItem ::= lhs { ',' lhs } '=>' s
+lastCatch ::= catchItem | ANY '=>' s
+catchList ::= lastCatch { \LL:2\ ';' lastCatch } 
+exits ::= EXITS [ exit { ';' [exit] } ]
+exit ::= n { ',' n } '=>' s
+for ::= FOR n [ ':' t ] ( '←' e ',' e  | [DECREASING] IN range )
+	| THROUGH range
+while ::= WHILE e | UNTIL e
+repeat ::= REPEAT [ exit { ';' [exit] } ] [ FINISHED '=>' s [';'] ]
+test ::= [NOT] (e | relationTail)
+e ::=  // expression
+	disjunct // includes lhs and [arglist]
+		[ '←' e ]
+	//| lhs '←' e 
+	//| '[' argList ']' '←' e 
+	| IF e THEN e ELSE e
+	| SELECT e FROM [ ( test { ',' test } '=>' e ) { ',' [ test { ',' test } '=>' e ] } ] ENDCASE '=>' e
+	| WITH openItem // includes e
+		SELECT [e] FROM 
+			[ ( e [':' t] { ',' e } '=>' e ) { ',' [ e [':' t] { ',' e } '=>' e ] } ]
+			ENDCASE '=>' e
+	| ERROR [lhs]
+	| SIGNAL lhs 
+	| FORK lhs 
+	| JOIN lhs 
+	// | NEW lhs // included in primary
+	| START lhs
+argList ::= 
+	arg [ ('~'|':') arg ] { ',' arg [ ('~'|':') arg ] }
+arg ::= e | trash
+disjunct ::= conjunct  { \LL:2\ OR conjunct }
+conjunct ::= negation { \LL:2\ AND negation }
+negation ::= [ NOT | '~' ] relation
+relation ::= sum [[NOT] relationTail]
+relationTail ::= ( ( '=' | '#' | '<' | '<=' | '>' | '>=' | '~<' | '~>' | '~=' ) sum | IN range )
+range ::= typeName [interval] | interval
+sum ::= product { ( '+' | '-' ) product }
+product ::= factor { ( '*' | '/' | MOD ) factor }
+factor ::= [ '+' | '-' ] primary
+primary ::= // NIL // included in typeOp
+	'[' argList ']' 
+	| prefixOp '[' arg { ',' arg } ']'
+	| ALL '[' arg ']' 
+	| VAL '[' arg ']' 
+	| ISTYPE '[' e ',' t ']' 
+	| typeOp '[' t [',' e] ']' 
+	// | SIZE '[' t ',' e ']' // included in typeOp
+	| lhs [ \LL:2\ '.' new_cons_list ]
+	| new_cons_list
+	| DESCRIPTOR '[' e [ ',' e [ ',' t ] ] ']' 
+	| '@' lhs
+new_cons_list ::= 
+	NEW ( '[' t [ '←' initVal | tilde initVal ] [catch] ']' | lhs )
+	| CONS '[' argList [catch] ']'
+	| LIST '[' argList ']'
+lhs ::= ( literal | n | '(' e ')' 
+	      | APPLY [ e ',' e [catch] ] 
+	      | NARROW [ e [ ',' t ] [catch] ] 
+	      | LOOPHOLE [ e [ ',' t ] ] )
+	{ '[' argList [catch] ']' | '.' ( n | prefixOp | typeOp ) | '^'  }
+catch ::= '!' [ catchList [';'] ]
+prefixOp ::= LONG | PRED | SUCC | ORD | ABS | MIN | MAX | BASE | LENGTH
+typeOp ::= FIRST | LAST | NIL | SIZE | CODE
+t ::= // type
+	typeConstructor // | typeName
+typeName ::= qualifiedName //| n typeName
+qualifiedName ::= { n '.' } n
+typeConstructor ::= 
+	typeApplication // includes typeName
+		( [interval]
+		| PAINTED t
+		| RELATIVE t )
+	| LONG t 
+	| VAR t 
+	| [UNCOUNTED ZONE]
+	| [ MACHINE DEPENDENT ] 
+		( '{' [ element { ',' element } ] '}'
+		| [MONITORED] RECORD fields  )
+	| [PACKED] ARRAY [t] OF t
+	| [safety] ( PROCEDURE | PROC | SIGNAL | ERROR | PROCESS | PROGRAM | PORT ) arguments
+	| REF [READONLY] [ t | ANY ]
+	| LIST OF [READONLY] t
+	| DESCRIPTOR FOR [READONLY] t
+	| [ORDERED] [BASE] POINTER [interval] [ TO [READONLY] t ] 
+	| FRAME '[' n ']'
+typeApplication ::= typeName '[' e ']' { '.' n | '[' e ']' }
+interval ::= 
+	'[' e '..' e ( ']' | ')' )
+	| '(' e '..' e ( ']' | ')' )
+element ::= n [ '(' e ')'  ] | '(' e ')'
+id ::= n [ '(' e [ ':' e '..' e ] ')' ]
+field ::= t [default]
+nfield- ::= id { ',' id } ':' [access] field
+field_or_nfield ::= t // t includes n
+	( [ '(' e [ ':' e '..' e ] ')' ] { \LL:2\ ',' id } ':' [access] field 
+	| [default] )
+variant ::= ( union | sequence ) [default]
+nvariant ::= id ':' [access] variant
+fields ::= NULL 
+	| '[' ( \LL:2\ variant | [ field_or_nfield { ',' field_or_nfield } ',' ] [nvariant] ) ']' 
+union ::= SELECT tag FROM ( n { ',' n } '=>' fields ) {',' [ n { ',' n } '=>' fields ]} ENDCASE
+tag ::= ( id ':' [access] | COMPUTED | OVERLAID ) ( t | '*' )
+sequence ::= [PACKED] SEQUENCE ( id ':' [access] | COMPUTED ) t OF t
+params ::= 
+	'[' [ field_or_nfield { ',' field_or_nfield} ] ']' 
+	| ANY
+arguments ::= [ [RETURNS] params ]
+literal ::= 
+	number
+	| string 
+	| char
+	| symbol // $n
+number ::=	
+string ::=
+char ::=
+symbol ::= 
+n ::= // name
+
+// Helper Tokens
+Comment ::=
+comment- ::= '<<' '>>' '--'
+
+// Pragmas
+%module ::= 'Cedar'
+%namespace ::= 'Cedar'
