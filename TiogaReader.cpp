@@ -567,6 +567,7 @@ struct tread_Reader {
                 out[i] = chars[0];
                 break;
             case 0xac: // this is '¬' in Latin-1 charset, convert to '←'
+            case '_':
                 out[i] = chars[1];
                 break;
             default:

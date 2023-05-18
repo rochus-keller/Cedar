@@ -111,7 +111,7 @@ Token Lexer::nextTokenImp()
 
         if( ch == '"' )
             return string();
-        else if( ch == negSym )
+        else if( ch == negSym || ch == '_' )
             return token( Tok_2190, 1, "_" );
         else if( ch == '\'')
             return character();
