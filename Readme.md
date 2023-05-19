@@ -16,6 +16,14 @@ A documentation file:
 A Cedar source file:
 ![TiogaViewer Screenshot](http://software.rochus-keller.ch/tiogaviewer-screenshot-2.png)
 
+#### Status on May 19, 2023
+
+I generated a parser using EbnfStudio and Coco/R with the existing grammar and started testing it. As it looks at the moment, the grammar still requires considerable effort until full compatibility with the existing code is achieved. 
+
+However, based on the present findings, I am rather reluctant to put in further effort.
+
+Having already inspected parts of the code with my tool (1993 Solaris version and Cedar 6.1) I'm very surprised that there don't seem to be any object oriented features in the given Cedar versions. I had a look at Lampson's Cedar language description some years ago and had the impression that it included OO support, but this has apparently not been implemented. I'm particularly interested in Cedar because Wirth created Oberon after his second stay at PARC where he was exposed to the Cedar language and environment. But Oberon and the Cedar language seem to have little in common. Instead the Cedar versions at hand seem just to be a moderate extension of Mesa with a rather peculiar and LL(1) unfriendly syntax. So at the moment I assume that Wirth - apart from certain similarities of the Cedar and Oberon system user interface - rather learned from Cedar how not to do it; Cedar as a language seemed to have played a minor role in the design of Oberon, which also limits my interest. I continue to look for confirmation of my findings.
+
 #### Precompiled versions
 
 No precompiled versions are available at this time.

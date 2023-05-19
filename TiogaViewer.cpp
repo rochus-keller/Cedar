@@ -17,6 +17,8 @@
 #include "TiogaReader.h"
 #include "TiogaViewer.h"
 #include "CedarHighlighter.h"
+#include "CedarParser.h"
+#include "CedarLexer.h"
 #include <QApplication>
 #include <QDir>
 #include <QDockWidget>
@@ -31,8 +33,9 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QtDebug>
+#include <QHeaderView>
 
-TiogaViewer::TiogaViewer(QWidget *parent) : QMainWindow(parent)
+TiogaViewer::TiogaViewer(QWidget *parent) : QMainWindow(parent),d_errs(0)
 {
     QWidget* pane = new QWidget(this);
     QVBoxLayout* vbox = new QVBoxLayout(pane);
@@ -89,7 +92,15 @@ TiogaViewer::TiogaViewer(QWidget *parent) : QMainWindow(parent)
     d_switch->addWidget(d_codeViewer);
 
     setCentralWidget(pane);
+    setDockNestingEnabled(true);
+    setCorner( Qt::BottomRightCorner, Qt::RightDockWidgetArea );
+    setCorner( Qt::BottomLeftCorner, Qt::LeftDockWidgetArea );
+    setCorner( Qt::TopRightCorner, Qt::RightDockWidgetArea );
+    setCorner( Qt::TopLeftCorner, Qt::LeftDockWidgetArea );
     createFileTree();
+#ifdef HAVE_PARSER
+    createErrs();
+#endif
 
     new QShortcut(tr("CTRL+O"),this,SLOT(onOpen()));
     new QShortcut(tr("CTRL+Q"),this,SLOT(close()));
@@ -181,6 +192,9 @@ void TiogaViewer::openFile(const QString& file)
             {
                 d_switch->setCurrentWidget(d_codeViewer);
                 d_codeViewer->setPlainText(r.text);
+#ifdef HAVE_PARSER
+                parseFile(r.text,file); // TEST
+#endif
             }else
             {
                 d_switch->setCurrentWidget(d_docViewer);
@@ -191,6 +205,33 @@ void TiogaViewer::openFile(const QString& file)
         d_title->setText(QString("cannot open file for reading: %1").arg(rfile));
 }
 
+void TiogaViewer::parseFile(const QString& code, const QString& file)
+{
+    d_errs->clear();
+
+    Cedar::Lexer lex;
+    lex.setStream(code,file);
+    Cedar::Parser p(&lex);
+    p.RunParser();
+
+    if( !p.errors.isEmpty() )
+    {
+        foreach( const Cedar::Parser::Error& e, p.errors )
+        {
+            QTreeWidgetItem* item = new QTreeWidgetItem(d_errs);
+            item->setText(2, e.msg );
+            item->setToolTip(2, item->text(2) );
+            item->setText(0, QFileInfo(e.path).completeBaseName() );
+            item->setToolTip(0, e.path );
+            item->setText(1, QString("%1:%2").arg(e.row).arg(e.col));
+            item->setData(0, Qt::UserRole, e.path );
+            item->setData(1, Qt::UserRole, e.row );
+            item->setData(2, Qt::UserRole, e.col );
+        }
+        d_errs->parentWidget()->show();
+    }
+}
+
 void TiogaViewer::onFileClicked(QTreeWidgetItem* item,int)
 {
     d_docViewer->clear();
@@ -199,6 +240,25 @@ void TiogaViewer::onFileClicked(QTreeWidgetItem* item,int)
     {
         const QString file = item->toolTip(0);
         openFile(file);
+    }
+}
+
+void TiogaViewer::onErrsClicked(QTreeWidgetItem* item, int)
+{
+    //showEditor( item->data(0, Qt::UserRole ).toString(),
+    //            ,  );
+    const int line = item->data(1, Qt::UserRole ).toInt() - 1;
+    const int col = item->data(2, Qt::UserRole ).toInt() - 1;
+    // Qt-Koordinaten
+    if( line >= 0 && line < d_codeViewer->document()->blockCount() )
+    {
+        QTextBlock block = d_codeViewer->document()->findBlockByNumber(line);
+        QTextCursor cur = d_codeViewer->textCursor();
+        cur.setPosition( block.position() + col );
+        cur.movePosition(QTextCursor::EndOfWord,QTextCursor::KeepAnchor);
+        d_codeViewer->setTextCursor( cur );
+        d_codeViewer->ensureCursorVisible();
+        d_codeViewer->setFocus();
     }
 }
 
@@ -228,6 +288,29 @@ void TiogaViewer::createFileTree()
     connect( d_fileTree,SIGNAL(itemClicked(QTreeWidgetItem*,int)), this, SLOT(onFileClicked(QTreeWidgetItem*,int)) );
 }
 
+void TiogaViewer::createErrs()
+{
+    QDockWidget* dock = new QDockWidget( tr("Issues"), this );
+    dock->setObjectName("Issues");
+    dock->setAllowedAreas( Qt::AllDockWidgetAreas );
+    dock->setFeatures( QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetClosable );
+    d_errs = new QTreeWidget(dock);
+    d_errs->setSizePolicy(QSizePolicy::MinimumExpanding,QSizePolicy::Preferred);
+    d_errs->setAlternatingRowColors(true);
+    d_errs->setHeaderHidden(true);
+    d_errs->setSortingEnabled(false);
+    d_errs->setAllColumnsShowFocus(true);
+    d_errs->setRootIsDecorated(false);
+    d_errs->setColumnCount(3);
+    d_errs->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    d_errs->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    d_errs->header()->setSectionResizeMode(2, QHeaderView::Stretch);
+    dock->setWidget(d_errs);
+    addDockWidget( Qt::BottomDockWidgetArea, dock );
+    connect(d_errs, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(onErrsClicked(QTreeWidgetItem*,int)) );
+    connect( new QShortcut( tr("ESC"), this ), SIGNAL(activated()), dock, SLOT(hide()) );
+
+}
 
 int main(int argc, char *argv[])
 {

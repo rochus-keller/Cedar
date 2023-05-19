@@ -5,6 +5,7 @@
 // - adapted to EbnfStudio syntax, reduced lexer productions, explicit number, char and symbol productions
 // - removed direct left recursions
 // - in process of removing LL(1) ambigs, remaining sequence ambigs
+// - renamed terminals colliding with C++ keywords ('_' suffix)
 
 module ::= [directory] n ':' [CEDAR] ( defsHead tilde defsBody | implHead tilde implBody ) '.'
 directory ::= DIRECTORY [ include { ',' include } ] ';'
@@ -24,22 +25,22 @@ safety ::= SAFE | UNSAFE
 checking ::= CHECKED | TRUSTED | UNCHECKED
 definition ::= n { ',' n } ':' [access] 
 	( [entry | READONLY] t [tilde initVal]
-	| TYPE [ '[' e ']' | tilde [access] t [default] ] ) 
+	| TYPE [ '[' e ']' | tilde [access] t [default_] ] ) 
 declaration ::= n { ',' n } ':' [access] 
 	( [entry] t [ ( tilde | '←' ) initVal ]
-	| TYPE tilde [access] t [default] ) 
+	| TYPE tilde [access] t [default_] ) 
 entry ::= ENTRY | INTERNAL
 tilde ::= '~' | '='
 initVal ::= e | trash // included in e: | CODE 
 	| [checking] ( [INLINE] block | MACHINE CODE machineCode )
 machineCode ::= '{' [ e { ',' e } { ';' [ e { ',' e } ] } ] '}'
 	| BEGIN [ e { ',' e } { ';' [ e { ',' e } ] } ] END
-default ::= '←' [ e [ '|' trash ] | trash ]
+default_ ::= '←' [ e [ '|' trash ] | trash ]
 trash ::= TRASH | NULL
 s ::= // statement
 	NULL 
-	| lhs ( '←' ( e | STATE ) | '.' FREE '[' e [catch] ']'  )
-	| FREE '[' e [catch] ']' 
+	| lhs ( '←' ( e | STATE ) | '.' FREE '[' e [catch_] ']'  )
+	| FREE '[' e [catch_] ']' 
 	| STATE '←' e 
 	| STOP
 	| '[' argList ']' '←' e 
@@ -54,7 +55,7 @@ s ::= // statement
 	| CONTINUE | RETRY | REJECT 
 	| RESUME [ lhs ] // lhs includes '[' argList ']'
 	| [checking] block
-	| [for] [while] DO scope [repeat] ENDLOOP
+	| [for_] [while_] DO scope [repeat] ENDLOOP
 	| IF e THEN s [ ELSE s ]
 	| SELECT e FROM [ ( test { ',' test } '=>' s ) { ';' [ ( test { ',' test } '=>' s ) ] } ] ENDCASE [ '=>' s ]
 	| WITH openItem // includes e
@@ -76,9 +77,9 @@ lastCatch ::= catchItem | ANY '=>' s
 catchList ::= lastCatch { \LL:2\ ';' lastCatch } 
 exits ::= EXITS [ exit { ';' [exit] } ]
 exit ::= n { ',' n } '=>' s
-for ::= FOR n [ ':' t ] ( '←' e ',' e  | [DECREASING] IN range )
+for_ ::= FOR n [ ':' t ] ( '←' e ',' e  | [DECREASING] IN range )
 	| THROUGH range
-while ::= WHILE e | UNTIL e
+while_ ::= WHILE e | UNTIL e
 repeat ::= REPEAT [ exit { ';' [exit] } ] [ FINISHED '=>' s [';'] ]
 test ::= [NOT] (e | relationTail)
 e ::=  // expression
@@ -123,21 +124,21 @@ primary ::= // NIL // included in typeOp
 	| DESCRIPTOR '[' e [ ',' e [ ',' t ] ] ']' 
 	| '@' lhs
 new_cons_list ::= 
-	NEW ( '[' t [ '←' initVal | tilde initVal ] [catch] ']' | lhs )
-	| CONS '[' argList [catch] ']'
+	NEW ( '[' t [ '←' initVal | tilde initVal ] [catch_] ']' | lhs )
+	| CONS '[' argList [catch_] ']'
 	| LIST '[' argList ']'
 lhs ::= ( literal | n | '(' e ')' 
-	      | APPLY [ e ',' e [catch] ] 
-	      | NARROW [ e [ ',' t ] [catch] ] 
+	      | APPLY [ e ',' e [catch_] ] 
+	      | NARROW [ e [ ',' t ] [catch_] ] 
 	      | LOOPHOLE [ e [ ',' t ] ] )
-	{ '[' argList [catch] ']' | '.' ( n | prefixOp | typeOp ) | '^'  }
-catch ::= '!' [ catchList [';'] ]
+	{ '[' argList [catch_] ']' | '.' ( n | prefixOp | typeOp ) | '^'  }
+catch_ ::= '!' [ catchList [';'] ]
 prefixOp ::= LONG | PRED | SUCC | ORD | ABS | MIN | MAX | BASE | LENGTH
 typeOp ::= FIRST | LAST | NIL | SIZE | CODE
 t ::= // type
 	typeConstructor // | typeName
 typeName ::= qualifiedName //| n typeName
-qualifiedName ::= { n '.' } n
+qualifiedName ::= { \LL:2\ n '.' } n
 typeConstructor ::= 
 	typeApplication // includes typeName
 		( [interval]
@@ -156,22 +157,22 @@ typeConstructor ::=
 	| DESCRIPTOR FOR [READONLY] t
 	| [ORDERED] [BASE] POINTER [interval] [ TO [READONLY] t ] 
 	| FRAME '[' n ']'
-typeApplication ::= typeName '[' e ']' { '.' n | '[' e ']' }
+typeApplication ::= typeName ['[' e ']'] { '.' n | '[' e ']' }
 interval ::= 
 	'[' e '..' e ( ']' | ')' )
 	| '(' e '..' e ( ']' | ')' )
 element ::= n [ '(' e ')'  ] | '(' e ')'
 id ::= n [ '(' e [ ':' e '..' e ] ')' ]
-field ::= t [default]
+field ::= t [default_]
 nfield- ::= id { ',' id } ':' [access] field
 field_or_nfield ::= t // t includes n
 	( [ '(' e [ ':' e '..' e ] ')' ] { \LL:2\ ',' id } ':' [access] field 
-	| [default] )
-variant ::= ( union | sequence ) [default]
+	| [default_] )
+variant ::= ( union_ | sequence ) [default_]
 nvariant ::= id ':' [access] variant
 fields ::= NULL 
 	| '[' ( \LL:2\ variant | [ field_or_nfield { ',' field_or_nfield } ',' ] [nvariant] ) ']' 
-union ::= SELECT tag FROM ( n { ',' n } '=>' fields ) {',' [ n { ',' n } '=>' fields ]} ENDCASE
+union_ ::= SELECT tag FROM ( n { ',' n } '=>' fields ) {',' [ n { ',' n } '=>' fields ]} ENDCASE
 tag ::= ( id ':' [access] | COMPUTED | OVERLAID ) ( t | '*' )
 sequence ::= [PACKED] SEQUENCE ( id ':' [access] | COMPUTED ) t OF t
 params ::= 

@@ -30,8 +30,7 @@ public:
     Lexer();
     ~Lexer();
 
-    void setStream(QIODevice*, const QString& filePath = QString());
-    QIODevice* getDevice() const { return d_in; }
+    void setStream(QString code, const QString& filePath = QString());
     void setIgnoreComments( bool b ) { d_ignoreComments = b; }
     void setPackComments( bool b ) { d_packComments = b; }
 

@@ -23,6 +23,8 @@ let exe ! : Executable {
 		./CedarTokenType.cpp
 		./TiogaReader.cpp
 		./TiogaViewer.cpp
+		./CedarSynTree.cpp
+		./CedarParser.cpp
     ]
     .include_dirs += [ . .. ]
     .deps += [ qt.libqt run_moc ]

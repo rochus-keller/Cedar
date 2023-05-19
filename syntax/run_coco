@@ -1,0 +1,10 @@
+../../Coco/Coco ./Cedar.atg -trace FP -o . -namespace Cedar > ./coco_out.txt
+
+mv ./Parser.h ../CedarParser.h
+mv ./Parser.cpp ../CedarParser.cpp
+
+mv ./CedarSynTree.h ..
+mv ./CedarSynTree.cpp ..
+
+mv ./CedarTokenType.h ..
+mv ./CedarTokenType.cpp ..

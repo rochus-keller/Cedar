@@ -33,13 +33,16 @@ public:
     explicit TiogaViewer(QWidget *parent = 0);
     void setRootPath( const QString& );
     void openFile( const QString& );
+    void parseFile(const QString& code, const QString& );
 signals:
 
 protected slots:
     void onFileClicked(QTreeWidgetItem*,int);
+    void onErrsClicked(QTreeWidgetItem*,int);
     void onOpen();
 protected:
     void createFileTree();
+    void createErrs();
 private:
     QTreeWidget* d_fileTree;
     QTextBrowser* d_docViewer;
@@ -47,6 +50,7 @@ private:
     QString d_root;
     QLabel* d_title;
     QStackedWidget* d_switch;
+    QTreeWidget* d_errs;
 };
 
 #endif // TIOGAVIEWER_H

@@ -30,11 +30,19 @@ Lexer::Lexer():
 
 Lexer::~Lexer()
 {
+    if( d_in )
+        delete d_in;
 }
 
-void Lexer::setStream(QIODevice* in, const QString& filePath)
+void Lexer::setStream(QString code, const QString& filePath)
 {
-    d_in = in;
+    if( d_in )
+        delete d_in;
+    QBuffer* buf = new QBuffer();
+    code.replace("←", QChar(negSym) );
+    buf->setData( code.toLatin1() );
+    buf->open(QIODevice::ReadOnly);
+    d_in = buf;
     d_lineNr = 0;
     d_colNr = 0;
     d_lastToken = Tok_Invalid;
@@ -72,11 +80,7 @@ Token Lexer::peekToken(quint8 lookAhead)
 
 QList<Token> Lexer::tokens(QString code)
 {
-    QBuffer in;
-    code.replace("←", QChar(negSym) );
-    in.setData( code.toLatin1() );
-    in.open(QIODevice::ReadOnly);
-    setStream( &in );
+    setStream( code );
 
     QList<Token> res;
     Token t = nextToken();
@@ -385,6 +389,7 @@ Token Lexer::character()
 
 Token Lexer::string()
 {
+    // TODO: strings can reach over more than one line
     int off = 1;
     while( true )
     {
