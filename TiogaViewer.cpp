@@ -30,6 +30,7 @@
 #include <QTextBrowser>
 #include <QTreeWidget>
 #include <QVBoxLayout>
+#include <QtDebug>
 
 TiogaViewer::TiogaViewer(QWidget *parent) : QMainWindow(parent)
 {
@@ -95,7 +96,7 @@ TiogaViewer::TiogaViewer(QWidget *parent) : QMainWindow(parent)
 }
 
 template<class T>
-static bool fillFiles( T* parent, const QDir& dir, const QStringList& suffix )
+static bool fillFiles( T* parent, const QDir& dir, const QStringList& suffix, const QIcon& folder, const QIcon& file )
 {
     const QStringList dirs = dir.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
 
@@ -106,9 +107,8 @@ static bool fillFiles( T* parent, const QDir& dir, const QStringList& suffix )
         QTreeWidgetItem* item = new QTreeWidgetItem(parent,QFileIconProvider::Folder);
         item->setText(0,d);
         item->setToolTip(0,path);
-        QFileIconProvider icon;
-        item->setIcon(0,icon.icon(QFileIconProvider::Folder));
-        if( !fillFiles( item, path, suffix ) )
+        item->setIcon(0,folder);
+        if( !fillFiles( item, path, suffix, folder, file ) )
             delete item;
         else
             hasFiles = true;
@@ -121,8 +121,7 @@ static bool fillFiles( T* parent, const QDir& dir, const QStringList& suffix )
         QTreeWidgetItem* item = new QTreeWidgetItem(parent,QFileIconProvider::File);
         item->setText(0,f);
         item->setToolTip(0,path);
-        QFileIconProvider icon;
-        item->setIcon(0,icon.icon(QFileIconProvider::File));
+        item->setIcon(0,file);
         hasFiles = true;
     }
     return hasFiles;
@@ -158,7 +157,10 @@ void TiogaViewer::setRootPath(const QString& path)
     d_title->clear();
     setWindowTitle(tr("%1 - TiogaViewer").arg(path));
     QApplication::setOverrideCursor(Qt::WaitCursor);
-    fillFiles( d_fileTree, path, filter() );
+    QFileIconProvider fip; // fip is apparently quite slow
+    QIcon folder = fip.icon(QFileIconProvider::Folder);
+    QIcon file = fip.icon(QFileIconProvider::File);
+    fillFiles( d_fileTree, path, filter(), folder, file );
     QApplication::restoreOverrideCursor();
 }
 
